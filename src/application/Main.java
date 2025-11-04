@@ -9,7 +9,7 @@ import javafx.stage.Stage ;
 
 
 public class Main extends Application
-    {
+{
 
     @Override
     public void start( final Stage primaryStage )
@@ -23,14 +23,16 @@ public class Main extends Application
                  .add( getClass().getResource( "application.css" )
                                  .toExternalForm() ) ;
             primaryStage.setScene( scene ) ;
+            primaryStage.setMaximized( true ) ;
+            primaryStage.centerOnScreen() ;
             primaryStage.show() ;
             }
         catch ( final Exception e )
             {
             e.printStackTrace() ;
-            }
-
         }
+
+    }
 
 
     public static void main( final String[] args )
@@ -38,6 +40,6 @@ public class Main extends Application
 
         launch( args ) ;
 
-        }
-
     }
+
+}
