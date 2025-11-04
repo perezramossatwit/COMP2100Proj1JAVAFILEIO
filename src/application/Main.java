@@ -12,15 +12,13 @@ public class Main extends Application
 {
 
     @Override
-    public void start( Stage primaryStage )
-    {
+    public void start( final Stage primaryStage )
+        {
 
         try
-        {
-            FXMLLoader loader = new FXMLLoader( getClass().getResource( "Sample.fxml" ) ) ;
-            loader.setController( new SampleController() ) ;
-            BorderPane root = (BorderPane) FXMLLoader.load( getClass().getResource( "Sample.fxml" ) ) ;
-            Scene scene = new Scene( root, 600, 600 ) ;
+            {
+            final BorderPane root = (BorderPane) FXMLLoader.load( getClass().getResource( "Sample.fxml" ) ) ;
+            final Scene scene = new Scene( root, 400, 400 ) ;
             scene.getStylesheets()
                  .add( getClass().getResource( "application.css" )
                                  .toExternalForm() ) ;
@@ -28,17 +26,17 @@ public class Main extends Application
             primaryStage.setMaximized( true ) ;
             primaryStage.centerOnScreen() ;
             primaryStage.show() ;
-        }
-        catch ( Exception e )
-        {
+            }
+        catch ( final Exception e )
+            {
             e.printStackTrace() ;
         }
 
     }
 
 
-    public static void main( String[] args )
-    {
+    public static void main( final String[] args )
+        {
 
         launch( args ) ;
 
