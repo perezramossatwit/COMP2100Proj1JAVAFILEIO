@@ -11,6 +11,7 @@ import java.io.InputStreamReader ;
 import java.io.OutputStreamWriter ;
 import java.net.ServerSocket ;
 import java.net.Socket ;
+import java.nio.charset.StandardCharsets ;
 import java.text.DateFormat ;
 import java.util.ArrayList ;
 import java.util.Date ;
@@ -22,24 +23,22 @@ import java.util.concurrent.ConcurrentHashMap ;
  *
  * @author Benjamin MacDougall, Sean Perez, Zach "", Alex ""
  *
- * @version 1.0 2025-09-24 Initial implementation
+ * @version 1.1 2025-11-05 Added detailed server logging
  *
  * @since 1.0
  */
 public class TCPServer
     {
 
-    private ServerSocket serverSocket ; // socket to listen for the incoming connections.
-    // map that tracks clients by their IDs and stores their socket. (importantly thread safe.)
+    private ServerSocket serverSocket ;
     private ConcurrentHashMap<String, Socket> clientMap ;
-    private File messageHistoryFile ; // History file that contains all chat history, along with
-                                      // timestamps and client IDs.
-    private BufferedWriter historyWriter ; // The file writer that adds to history file.
+    private File messageHistoryFile ;
+    private BufferedWriter historyWriter ;
 
 
     /**
      * @param port
-     *     this is the port the server is hosted on.
+     *     : this is the port that the server runs out of.
      *
      * @since 1.0
      */
@@ -48,75 +47,61 @@ public class TCPServer
 
         try
             {
-            // this is all initializing the instance variables.
             this.serverSocket = new ServerSocket( port ) ;
-
             this.clientMap = new ConcurrentHashMap<>() ;
-
             this.messageHistoryFile = new File( "message_history_test.txt" ) ;
-
             this.historyWriter = new BufferedWriter( new FileWriter( this.messageHistoryFile,
                                                                      true ) ) ;
 
-            System.out.println( "The best groups TCP chat server successfully started on port: " +
+            System.out.println( "TCP chat server started successfully on port: " +
                                 port ) ;
-
-            // here is the main loop where the server accepts all new clients and makes a new thread
-            // for each one.
+            System.out.println( "Waiting for incoming client connections..." ) ;
 
             while ( true )
                 {
                 final Socket clientSocket = this.serverSocket.accept() ;
+                System.out.println( "New client connection from: " +
+                                    clientSocket.getRemoteSocketAddress() ) ;
                 new ClientHandler( clientSocket ).start() ;
                 }
 
             }
         catch ( final IOException e )
             {
+            System.err.println( "Server failed to start: " + e.getMessage() ) ;
             e.printStackTrace() ;
             }
 
         }
 
 
-    // this method is synchronized so it can only be accessed by one thread at a time. since
-    // buffered writer/reader isn't thread safe
-    // resulting in race exceptions and corrupted data in the history file. (not good).
-    // this method takes care of logging history and sending the message to the user.
     private synchronized void sendMessage( final String senderID,
                                            final String recipientID,
                                            final String message )
         {
 
         final String timestamp = DateFormat.getDateTimeInstance()
-                                           .format( new Date( System.currentTimeMillis() ) ) ; // idk
-                                                                                               // if
-                                                                                               // this
-                                                                                               // works
-                                                                                               // i
-                                                                                               // looked
-                                                                                               // it
-                                                                                               // up
-                                                                                               // ngl
+                                           .format( new Date( System.currentTimeMillis() ) ) ;
 
-        // these are strings formatted for each purpose. Sender, recipient, and server.
         final String serverFormat = "[" + timestamp + "] " + senderID + " -> " +
                                     recipientID + ": " + message ;
         final String senderFormat = "To " + recipientID + ": " + message ;
         final String recipientFormat = "From " + senderID + ": " + message ;
 
-        // this try catch is to write to the history text file.
         try
             {
             this.historyWriter.write( serverFormat + '\n' ) ;
             this.historyWriter.flush() ;
+            System.out.println( "Message saved to history: " + serverFormat ) ;
             }
         catch ( final IOException e )
             {
+            System.err.println( "Failed to write message to history for " +
+                                senderID + " -> " + recipientID + ": " +
+                                e.getMessage() ) ;
             e.printStackTrace() ;
             }
 
-        // check the clientMap to see if the user is online. and sends if so
         final Socket recipientSocket = this.clientMap.get( recipientID ) ;
 
         if ( recipientSocket != null )
@@ -124,38 +109,44 @@ public class TCPServer
 
             try
                 {
-                // the actual sending of the message through the buffered writer!!!!
                 final BufferedWriter out = new BufferedWriter( new OutputStreamWriter( recipientSocket.getOutputStream() ) ) ;
                 out.write( recipientFormat + '\n' ) ;
                 out.flush() ;
+                System.out.println( "Sent message from " + senderID + " to " +
+                                    recipientID ) ;
                 }
             catch ( final IOException e )
                 {
-                e.printStackTrace() ;
+                System.err.println( "Failed to send message to " + recipientID +
+                                    ": " + e.getMessage() ) ;
                 }
 
-            // confirmation to the sender so they can show the sent message on their screen.
             final Socket senderSocket = this.clientMap.get( senderID ) ;
 
-            // just in case, in the rare case the sender closes their connection after the server
-            // gets the message and before the receiver gets the message.
             if ( senderSocket != null )
                 {
 
                 try
                     {
-                    // sending back to the sender for sent/visual notification
                     final BufferedWriter out = new BufferedWriter( new OutputStreamWriter( senderSocket.getOutputStream() ) ) ;
                     out.write( senderFormat + '\n' ) ;
                     out.flush() ;
+                    System.out.println( "Confirmation sent back to sender: " +
+                                        senderID ) ;
                     }
                 catch ( final IOException e )
                     {
-                    e.printStackTrace() ;
+                    System.err.println( "Failed to send confirmation to sender " +
+                                        senderID + ": " + e.getMessage() ) ;
                     }
 
                 }
 
+            }
+        else
+            {
+            System.out.println( "Recipient " + recipientID +
+                                " is offline. Message stored in history only." ) ;
             }
 
         }
@@ -167,6 +158,9 @@ public class TCPServer
         {
 
         final List<String> history = new ArrayList<>() ;
+
+        System.out.println( "Retrieving message history between " + user1 +
+                            " and " + user2 + "..." ) ;
 
         try ( BufferedReader reader = new BufferedReader( new FileReader( this.messageHistoryFile ) ) )
             {
@@ -183,10 +177,14 @@ public class TCPServer
 
                 }
 
+            System.out.println( "Found " + history.size() +
+                                " messages between " + user1 + " and " +
+                                user2 ) ;
             }
         catch ( final IOException e )
             {
-            e.printStackTrace() ;
+            System.err.println( "Error reading message history: " +
+                                e.getMessage() ) ;
             }
 
         return history ;
@@ -197,49 +195,17 @@ public class TCPServer
     private class ClientHandler extends Thread
         {
 
-        private BufferedReader in ; // using buffered reader/writer because they work well with
-                                    // regular text (which is what we are using)
-        private BufferedWriter out ;// we aren't using them for anything other than char streams.
-        // they also read line by line so we can use the new line char/string manipulation to
-        // separate client id recipient id and the message.
-        // meaning we can easily separate them back into separate strings/arrays for ease of use.
-
-        // the client will send something like this:
-
-        // Ben123 REQ (sender requesting history)
-        // Sean222 (receiver)
-
-        // we can search the line for REQ (we can change this to something else)** which means to
-        // send back the message history of the two so the client can see message history
-        // or it can look like this:
-
-        // Ben123 (user1 sender)
-        // Sean222 (user2 receiver)
-        // Hello!! (message)
-
-        // **the only thing is we need to make sure the users name does not ever have REQ or
-        // whatever we decide to use as the send history flag.
-        // so that way a user is never stun-locked and never able to send a message because all of
-        // their sent messages are flagged as history requests.
-        // Zach brought up the idea to use invisible or non typeable chars as flags so we dont have
-        // to restrict usernames.
-
+        private final Socket socket ;
+        private BufferedReader in ;
+        private BufferedWriter out ;
         private String clientID ;
         private String recipientID ;
 
 
-        public ClientHandler( final Socket socket )
+        public ClientHandler( final Socket socketInput )
             {
 
-            try
-                {
-                this.in = new BufferedReader( new InputStreamReader( socket.getInputStream() ) ) ;
-                this.out = new BufferedWriter( new OutputStreamWriter( socket.getOutputStream() ) ) ;
-                }
-            catch ( final IOException e )
-                {
-                e.printStackTrace() ;
-                }
+            this.socket = socketInput ;
 
             }
 
@@ -250,25 +216,54 @@ public class TCPServer
 
             try
                 {
+                this.in = new BufferedReader( new InputStreamReader( this.socket.getInputStream(),
+                                                                     StandardCharsets.UTF_8 ) ) ;
+                this.out = new BufferedWriter( new OutputStreamWriter( this.socket.getOutputStream(),
+                                                                       StandardCharsets.UTF_8 ) ) ;
+
+                System.out.println( "Handler started for client socket: " +
+                                    this.socket.getRemoteSocketAddress() ) ;
 
                 while ( true )
                     {
-                    final String line = this.in.readLine() ; // Could be either a message request or
-                                                             // a history request "REQ"
+                    final String line = this.in.readLine() ;
 
                     if ( line == null )
                         {
+                        System.out.println( "Client " + ( this.clientID != null
+                            ? this.clientID
+                            : "unknown" ) + " disconnected." ) ;
                         break ;
                         }
 
                     if ( line.endsWith( "REQ" ) )
                         {
-                        this.clientID = line.substring( 0,
-                                                        line.indexOf( " " ) ) ;
+                        final int spaceIndex = line.indexOf( ' ' ) ;
+
+                        if ( spaceIndex == -1 )
+                            {
+                            System.out.println( "Received malformed REQ: " +
+                                                line ) ;
+                            continue ;
+                            }
+
+                        this.clientID = line.substring( 0, spaceIndex ) ;
                         this.recipientID = this.in.readLine() ;
 
-                        // get history and send it over using this.out the buffer writer to the
-                        // client. NOT THE TARGET. FOR HISTORY REQUESTS WE SEND BACK TO THE CLIENT.
+                        if ( this.recipientID == null )
+                            {
+                            System.out.println( "Client " + this.clientID +
+                                                " disconnected mid-history request." ) ;
+                            break ;
+                            }
+
+                        TCPServer.this.clientMap.putIfAbsent( this.clientID,
+                                                              this.socket ) ;
+
+                        System.out.println( this.clientID +
+                                            " requested history with " +
+                                            this.recipientID ) ;
+
                         final List<String> history = getMessageHistoryBetween( this.clientID,
                                                                                this.recipientID ) ;
 
@@ -278,15 +273,31 @@ public class TCPServer
                             }
 
                         this.out.flush() ;
+                        System.out.println( "Sent history (" + history.size() +
+                                            " lines) to " + this.clientID ) ;
                         }
                     else
                         {
-                        // regular messages
                         this.clientID = line ;
                         this.recipientID = this.in.readLine() ;
                         final String message = this.in.readLine() ;
 
-                        // sending the message using the send message method
+                        if ( ( this.recipientID == null ) ||
+                             ( message == null ) )
+                            {
+                            System.out.println( "Client " + this.clientID +
+                                                " disconnected mid-message send." ) ;
+                            break ;
+                            }
+
+                        TCPServer.this.clientMap.putIfAbsent( this.clientID,
+                                                              this.socket ) ;
+
+                        System.out.println( "Message received from " +
+                                            this.clientID + " to " +
+                                            this.recipientID + ": " +
+                                            message ) ;
+
                         sendMessage( this.clientID,
                                      this.recipientID,
                                      message ) ;
@@ -297,7 +308,65 @@ public class TCPServer
                 }
             catch ( final IOException e )
                 {
+                System.err.println( "Connection error with client " +
+                                    this.clientID + ": " + e.getMessage() ) ;
+                }
+            catch ( final Exception e )
+                {
+                System.err.println( "Unexpected error with client " +
+                                    this.clientID + ": " + e.getMessage() ) ;
                 e.printStackTrace() ;
+                }
+            finally
+                {
+
+                try
+                    {
+
+                    if ( this.in != null )
+                        {
+                        this.in.close() ;
+                        }
+
+                    }
+                catch ( final IOException ignored )
+                    {}
+
+                try
+                    {
+
+                    if ( this.out != null )
+                        {
+                        this.out.close() ;
+                        }
+
+                    }
+                catch ( final IOException ignored )
+                    {}
+
+                try
+                    {
+
+                    if ( ( this.socket != null ) && !this.socket.isClosed() )
+                        {
+                        this.socket.close() ;
+                        }
+
+                    }
+                catch ( final IOException ignored )
+                    {}
+
+                if ( this.clientID != null )
+                    {
+                    TCPServer.this.clientMap.remove( this.clientID ) ;
+                    System.out.println( "Removed " + this.clientID +
+                                        " from client map." ) ;
+                    }
+
+                System.out.println( "Client handler cleaned up for " +
+                                    ( this.clientID != null
+                                        ? this.clientID
+                                        : "unknown" ) ) ;
                 }
 
             }
@@ -305,6 +374,12 @@ public class TCPServer
         }
 
 
+    /**
+     * @param args
+     *     unused.
+     *
+     * @since 1.0
+     */
     public static void main( final String[] args )
         {
 
@@ -312,4 +387,4 @@ public class TCPServer
 
         }
 
-    }// end class TCPServer
+    } // end class TCPServer

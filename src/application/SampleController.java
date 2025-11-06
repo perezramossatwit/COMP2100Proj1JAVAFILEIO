@@ -3,13 +3,14 @@ package application ;
 
 import javafx.event.ActionEvent ;
 import javafx.fxml.FXML ;
-import javafx.scene.control.Button ;
 import javafx.scene.control.TextArea ;
 import javafx.scene.control.TextField ;
 
+import jdk.internal.org.jline.terminal.MouseEvent.Button ;
+
 
 public class SampleController
-{
+    {
 
     @FXML
     private Button send ;
@@ -22,23 +23,23 @@ public class SampleController
 
 
     public void initialize()
-    {
+        {
 
-        messageBox.setEditable( false ) ;
+        this.messageBox.setEditable( false ) ;
 
-    }
+        }
 
 
     @FXML
     private void messageSend( ActionEvent event )
-    {
+        {
 
-        String userTyped = userMessage.getText() ;
-        messageBox.appendText( userTyped ) ;
-        messageBox.appendText( "\n" ) ;
-        userMessage.clear() ;
+        String userTyped = this.userMessage.getText() ;
+        this.messageBox.appendText( userTyped ) ;
+        this.messageBox.appendText( "\n" ) ;
+        this.userMessage.clear() ;
+
+        }
+
 
     }
-
-
-}
