@@ -25,7 +25,8 @@ public class TCPClient implements Runnable
     BufferedReader in ;
     BufferedWriter out ;
     Thread thread ;
-    
+    public volatile boolean running = true;
+    public String message;
     
     /**
      * 
@@ -51,16 +52,43 @@ public class TCPClient implements Runnable
 
         try 
             {
-        //stuff happens
+                while(running)
+                {
+                String line = this.in.readLine() ;
+                line = this.in.readLine() ;
+                message = this.in.readLine() ;
+                
+                }
             } 
         catch( IOException e)
             {
-            e.printStackTrace();
+                stop();
+                e.printStackTrace();
             }
-        
+
+        }
+
+        /**
+     * 
+     * @param message
+     *
+     * @since 1.0
+     * 
+     * Getter for the message 
+     */
+    public String sentMessage( )
+        {
+
+        return message;
         
 
         }
 
+
+        public void stop()
+        {
+            running = false;
+            this.clientSocket.close();
+        }
     }
    // end class TCPClient
