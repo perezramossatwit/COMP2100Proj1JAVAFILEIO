@@ -1,5 +1,5 @@
 
-package application;
+package application ;
 
 import java.io.BufferedReader ;
 import java.io.BufferedWriter ;
@@ -7,42 +7,46 @@ import java.io.IOException ;
 import java.io.InputStreamReader ;
 import java.io.OutputStreamWriter ;
 import java.net.Socket ;
+import java.util.concurrent.ConcurrentLinkedQueue ;
 
 /**
- * 
  * @author Ben
  *
  * @version 1.0 2025-11-06 Initial implementation
- *
  *
  * @since 1.0
  */
 public class TCPClient implements Runnable
     {
 
-    String clientID ;
-    Socket clientSocket ;
-    BufferedReader in ;
-    BufferedWriter out ;
-    Thread thread ;
-    public volatile boolean running = true;
-    public String message;
-    
+
+    private final String clientID ;
+    private final Socket clientSocket ;
+    private final BufferedReader in ;
+    private final BufferedWriter out ;
+    private final Thread thread ;
+    private volatile boolean running = true ;
+    private final ConcurrentLinkedQueue<String> messageQueue ;
+    private final ConcurrentLinkedQueue<String> messageConfirmation;
+
+
     /**
-     * 
-     *
      * @since 1.0
      */
-    public TCPClient(String id, String hostIP, int port) throws IOException
+    public TCPClient( final String id,
+                      final String hostIP,
+                      final int port ) throws IOException
         {
 
-        this.clientID = id;
-        this.clientSocket = new Socket(hostIP, port);
-        this.in = new BufferedReader(new InputStreamReader(this.clientSocket.getInputStream()) );
-        this.out = new BufferedWriter(new OutputStreamWriter(this.clientSocket.getOutputStream()) );
-        this.thread = new Thread(this);
-        this.thread.start();
-        
+        this.clientID = id ;
+        this.clientSocket = new Socket( hostIP, port ) ;
+        this.in = new BufferedReader( new InputStreamReader( this.clientSocket.getInputStream() ) ) ;
+        this.out = new BufferedWriter( new OutputStreamWriter( this.clientSocket.getOutputStream() ) ) ;
+        this.messageQueue = new ConcurrentLinkedQueue<>() ;
+        this.messageConfirmation = new ConcurrentLinkedQueue<>() ;
+        this.thread = new Thread( this ) ;
+        this.thread.start() ;
+
         }
 
 
@@ -50,45 +54,94 @@ public class TCPClient implements Runnable
     public void run()
         {
 
-        try 
+        try
             {
-                while(running)
+
+            while ( this.running )
                 {
                 String line = this.in.readLine() ;
                 line = this.in.readLine() ;
-                message = this.in.readLine() ;
-                
+                String message = this.in.readLine() ;
+                this.messageQueue.add( message ) ;
                 }
-            } 
-        catch( IOException e)
+
+            }
+        catch ( final IOException e )
             {
-                stop();
-                e.printStackTrace();
+            stop() ;
+            e.printStackTrace() ;
             }
 
         }
 
-        /**
+
+    /**
      * 
+     * @param recieverID
      * @param message
      *
      * @since 1.0
-     * 
-     * Getter for the message 
      */
-    public String sentMessage( )
+    public void sendMessage( final String recieverID, final String message )
+        {
+           
+            try
+                {
+                this.out.write(recieverID+ '\n');
+                this.out.write( this.clientID + '\n');
+                this.out.write( message + '\n');
+                this.out.flush();
+                }
+            catch ( IOException e )
+                {
+                System.out.println("Error Sending Message.");
+                e.printStackTrace() ;
+                }
+            
+        }
+
+
+    /**
+     * @return the oldest message
+     *
+     * @since 1.0
+     */
+    public String poll()
         {
 
-        return message;
-        
+        return this.messageQueue.poll() ;
 
         }
 
 
-        public void stop()
+    /**
+     * @return the oldest message.
+     *
+     * @since 1.0
+     */
+    public String peek()
         {
-            running = false;
-            this.clientSocket.close();
+
+        return this.messageQueue.peek() ;
+
         }
+
+
+    public void stop()
+        {
+
+        this.running = false ;
+
+        try
+            {
+            this.clientSocket.close() ;
+            }
+        catch ( final IOException e )
+            {
+            e.printStackTrace() ;
+            }
+
+        }
+
     }
-   // end class TCPClient
+// end class TCPClient
