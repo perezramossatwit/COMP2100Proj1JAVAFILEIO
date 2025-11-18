@@ -6,9 +6,6 @@ import javafx.fxml.FXML ;
 import javafx.scene.control.TextArea ;
 import javafx.scene.control.TextField ;
 
-import jdk.internal.org.jline.terminal.MouseEvent.Button ;
-
-
 public class SampleController
     {
 
