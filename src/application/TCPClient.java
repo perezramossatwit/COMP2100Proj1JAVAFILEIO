@@ -12,14 +12,12 @@ import java.util.concurrent.ConcurrentLinkedQueue ;
 /**
  * @author Benjamin, Zach
  *
- * @version 1.0 2025-11-06 Initial implementation
+ * @version 1.3 2025-11-06 Removed some bugs relating to history requests.
  *
  * @since 1.0
  */
 public class TCPClient implements Runnable
     {
-
-
     private final String clientID ;
     private final Socket clientSocket ;
     private final BufferedReader in ;
@@ -51,7 +49,9 @@ public class TCPClient implements Runnable
 
         }
 
-
+    /**
+     * @since 1.0
+     */
     @Override
     public void run()
         {
@@ -171,7 +171,9 @@ public class TCPClient implements Runnable
 
 
     /**
-     * @return the oldest message.
+     * Returns the oldest message without changing the queue.
+     * 
+     * @return The oldest message.
      *
      * @since 1.0
      */
